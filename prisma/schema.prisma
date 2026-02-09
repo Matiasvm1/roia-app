@@ -1,0 +1,154 @@
+// Roia - Prisma Schema
+// Sistema de gestión textil
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── PERFILES DE USUARIO ────────────────────────────────────
+model Profile {
+  id         String   @id @default(uuid())
+  authUserId String   @unique @map("auth_user_id") // Supabase Auth uid
+  username   String   @unique
+  email      String   @unique
+  fullName   String   @map("full_name")
+  role       String   @default("employee") // "admin" | "employee"
+  avatarUrl  String?  @map("avatar_url")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
+
+// ─── CLIENTES ───────────────────────────────────────────────
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  notes     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@map("clients")
+}
+
+// ─── CATÁLOGO DE ARTÍCULOS / PRENDAS ────────────────────────
+model Article {
+  id        String   @id @default(uuid())
+  name      String
+  basePrice Float    @map("base_price")
+  category  String?  // ej: "Remeras", "Pantalones", "Camisas"
+  description String?
+  imageUrl  String?  @map("image_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orderItems OrderItem[]
+
+  @@map("articles")
+}
+
+// ─── ESTADOS DE PRODUCCIÓN (ESCALABLE, SIN ENUMS) ───────────
+model ProductionStatus {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  orderIndex Int     @map("order_index") // para ordenar en el UI
+  colorHex  String   @default("#6B7280") @map("color_hex")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@map("production_statuses")
+}
+
+// ─── ÓRDENES DE PRODUCCIÓN ──────────────────────────────────
+model Order {
+  id             String   @id @default(uuid())
+  orderNumber    Int      @unique @default(autoincrement()) @map("order_number")
+  clientId       String   @map("client_id")
+  statusId       String   @map("status_id")
+  totalPrice     Float    @default(0) @map("total_price")
+  deliveryDate   DateTime? @map("delivery_date")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  client Client           @relation(fields: [clientId], references: [id])
+  status ProductionStatus @relation(fields: [statusId], references: [id])
+  items  OrderItem[]
+  images OrderImage[]
+
+  @@map("orders")
+}
+
+// ─── IMÁGENES DE DISEÑO POR ORDEN ───────────────────────────
+model OrderImage {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  url       String   // URL pública en Supabase Storage
+  fileName  String   @map("file_name") // nombre original del archivo
+  storagePath String @map("storage_path") // path en el bucket para poder borrar
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_images")
+}
+
+// ─── ITEMS DE CADA ORDEN (TABLA INTERMEDIA) ─────────────────
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String @map("order_id")
+  articleId String @map("article_id")
+  quantity  Int    @default(1)
+  unitPrice Float  @map("unit_price")
+  size      String? // ej: "S", "M", "L", "XL"
+  color     String?
+  notes     String?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id])
+
+  @@map("order_items")
+}
+
+// ─── COMPRAS / INSUMOS ──────────────────────────────────────
+model Purchase {
+  id          String   @id @default(uuid())
+  supplier    String
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  category    String?  // ej: "Telas", "Hilos", "Accesorios"
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("purchases")
+}
+
+// ─── GASTOS FIJOS ───────────────────────────────────────────
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+  amount      Float
+  category    String?  // ej: "Alquiler", "Servicios", "Sueldos"
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("expenses")
+}

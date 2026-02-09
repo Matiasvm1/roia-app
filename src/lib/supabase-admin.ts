@@ -1,12 +1,23 @@
 import { createClient } from "@supabase/supabase-js";
 
 /**
+ * Sanitize env var: remove ALL invisible/whitespace/BOM/zero-width chars.
+ */
+function cleanKey(raw: string | undefined): string {
+  if (!raw) return "";
+  // Remove BOM, zero-width spaces, all whitespace, carriage returns, quotes
+  return raw
+    .replace(/[\s\r\n\t\u200B\u200C\u200D\uFEFF\u00A0]/g, "")
+    .replace(/^["']|["']$/g, "");
+}
+
+/**
  * Supabase client with service role key — server-side only.
  * Bypasses RLS. Used for admin operations (user management, storage).
  */
 export function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const serviceRoleKey = cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!supabaseUrl) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
   if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
@@ -32,12 +43,23 @@ export async function storageUpload(
   body: Uint8Array,
   contentType: string
 ): Promise<{ error: string | null }> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const serviceRoleKey = cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!supabaseUrl || !serviceRoleKey) {
     return { error: "Supabase env vars not set" };
   }
+
+  // Diagnostic logging (safe: only structural info, no secrets)
+  const segments = serviceRoleKey.split(".");
+  console.log("[storageUpload] key diagnostics:", {
+    length: serviceRoleKey.length,
+    segments: segments.length,
+    startsWithEyJ: serviceRoleKey.startsWith("eyJ"),
+    headerLen: segments[0]?.length,
+    payloadLen: segments[1]?.length,
+    sigLen: segments[2]?.length,
+  });
 
   const url = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`;
 
@@ -54,7 +76,7 @@ export async function storageUpload(
 
   if (!res.ok) {
     const errBody = await res.text();
-    console.error("Storage upload error:", res.status, errBody);
+    console.error("[storageUpload] error:", res.status, errBody);
     return { error: `Storage error ${res.status}: ${errBody}` };
   }
 
@@ -68,8 +90,8 @@ export async function storageDelete(
   bucket: string,
   paths: string[]
 ): Promise<void> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const serviceRoleKey = cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!supabaseUrl || !serviceRoleKey) return;
 
@@ -90,6 +112,6 @@ export async function storageDelete(
  * Get public URL for a file in Supabase Storage.
  */
 export function storagePublicUrl(bucket: string, path: string): string {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
 }

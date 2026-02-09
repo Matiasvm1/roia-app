@@ -425,19 +425,6 @@ export async function deleteOrder(id: string) {
 // IMÁGENES DE DISEÑO
 // ═══════════════════════════════════════════════════════════════
 
-async function ensureBucketExists() {
-  const supabase = getSupabaseAdmin();
-  // Intentar obtener el bucket. Si no existe, crearlo.
-  const { error } = await supabase.storage.getBucket(DESIGNS_BUCKET);
-  if (error) {
-    await supabase.storage.createBucket(DESIGNS_BUCKET, {
-      public: true,
-      fileSizeLimit: 10 * 1024 * 1024, // 10MB max
-      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    });
-  }
-}
-
 export async function uploadOrderImage(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   const file = formData.get("file") as File;
@@ -457,7 +444,6 @@ export async function uploadOrderImage(formData: FormData) {
   }
 
   try {
-    await ensureBucketExists();
     const supabase = getSupabaseAdmin();
 
     // Generar path único: orders/{orderId}/{timestamp}-{filename}

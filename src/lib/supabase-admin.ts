@@ -35,7 +35,6 @@ export const DESIGNS_BUCKET = "designs";
 
 /**
  * Upload a file to Supabase Storage using the REST API directly.
- * Bypasses supabase-js to avoid auth header corruption in Vercel serverless.
  */
 export async function storageUpload(
   bucket: string,
@@ -49,17 +48,6 @@ export async function storageUpload(
   if (!supabaseUrl || !serviceRoleKey) {
     return { error: "Supabase env vars not set" };
   }
-
-  // Diagnostic logging (safe: only structural info, no secrets)
-  const segments = serviceRoleKey.split(".");
-  console.log("[storageUpload] key diagnostics:", {
-    length: serviceRoleKey.length,
-    segments: segments.length,
-    startsWithEyJ: serviceRoleKey.startsWith("eyJ"),
-    headerLen: segments[0]?.length,
-    payloadLen: segments[1]?.length,
-    sigLen: segments[2]?.length,
-  });
 
   const url = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`;
 

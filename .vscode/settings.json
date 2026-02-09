@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^grep \"SUPABASE_SERVICE_ROLE_KEY\" \\.env \\| awk -F'=' '\\{print length\\(\\$2\\), substr\\(\\$2, 1, 10\\) \"\\.\\.\\.\" substr\\(\\$2, length\\(\\$2\\)-5\\)\\}'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

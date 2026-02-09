@@ -451,7 +451,6 @@ export async function uploadOrderImage(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    // Upload using direct REST API (bypasses supabase-js auth header issues)
     const { error: uploadError } = await storageUpload(
       DESIGNS_BUCKET,
       storagePath,

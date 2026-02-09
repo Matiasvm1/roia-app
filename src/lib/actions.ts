@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getSupabaseAdmin, DESIGNS_BUCKET } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, DESIGNS_BUCKET, storageUpload, storageDelete, storagePublicUrl } from "@/lib/supabase-admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -405,10 +405,7 @@ export async function deleteOrder(id: string) {
   const images = await prisma.orderImage.findMany({ where: { orderId: id } });
   if (images.length > 0) {
     try {
-      const supabase = getSupabaseAdmin();
-      await supabase.storage
-        .from(DESIGNS_BUCKET)
-        .remove(images.map((img) => img.storagePath));
+      await storageDelete(DESIGNS_BUCKET, images.map((img) => img.storagePath));
     } catch {
       // Si falla el borrado de Storage, igual borramos de DB
     }
@@ -444,41 +441,37 @@ export async function uploadOrderImage(formData: FormData) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
-
     // Generar path único: orders/{orderId}/{timestamp}-{filename}
-    const ext = file.name.split(".").pop() ?? "jpg";
     const safeName = file.name
       .replace(/[^a-zA-Z0-9._-]/g, "_")
       .substring(0, 50);
     const storagePath = `orders/${orderId}/${Date.now()}-${safeName}`;
 
-    // Convertir File a Buffer para el upload server-side
+    // Convertir File a Uint8Array para el upload server-side
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
 
-    const { error: uploadError } = await supabase.storage
-      .from(DESIGNS_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
+    // Upload using direct REST API (bypasses supabase-js auth header issues)
+    const { error: uploadError } = await storageUpload(
+      DESIGNS_BUCKET,
+      storagePath,
+      bytes,
+      file.type
+    );
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
-      return { error: `Error al subir: ${uploadError.message}` };
+      return { error: `Error al subir: ${uploadError}` };
     }
 
     // Obtener URL pública
-    const { data: publicUrlData } = supabase.storage
-      .from(DESIGNS_BUCKET)
-      .getPublicUrl(storagePath);
+    const publicUrl = storagePublicUrl(DESIGNS_BUCKET, storagePath);
 
     // Guardar en DB
     const image = await prisma.orderImage.create({
       data: {
         orderId,
-        url: publicUrlData.publicUrl,
+        url: publicUrl,
         fileName: file.name,
         storagePath,
       },
@@ -504,10 +497,7 @@ export async function deleteOrderImage(imageId: string) {
   if (!image) return { error: "Imagen no encontrada" };
 
   try {
-    const supabase = getSupabaseAdmin();
-    await supabase.storage
-      .from(DESIGNS_BUCKET)
-      .remove([image.storagePath]);
+    await storageDelete(DESIGNS_BUCKET, [image.storagePath]);
   } catch {
     // Si falla el borrado de Storage, igual borramos de DB
   }

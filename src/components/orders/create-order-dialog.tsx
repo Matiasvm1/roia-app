@@ -32,7 +32,6 @@ type OrderItem = {
   quantity: number;
   unitPrice: number;
   size: string;
-  color: string;
 };
 
 interface CreateOrderDialogProps {
@@ -52,7 +51,7 @@ export function CreateOrderDialog({ clients, statuses, articles }: CreateOrderDi
   function addItem() {
     setItems([
       ...items,
-      { articleId: "", articleName: "", quantity: 1, unitPrice: 0, size: "", color: "" },
+      { articleId: "", articleName: "", quantity: 1, unitPrice: 0, size: "" },
     ]);
   }
 
@@ -93,7 +92,7 @@ export function CreateOrderDialog({ clients, statuses, articles }: CreateOrderDi
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           size: item.size || undefined,
-          color: item.color || undefined,
+          color: undefined,
         }))
       )
     );
@@ -195,80 +194,85 @@ export function CreateOrderDialog({ clients, statuses, articles }: CreateOrderDi
             )}
 
             {items.map((item, index) => (
-              <div key={index} className="border rounded-lg p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">
+              <div
+                key={index}
+                className="border rounded-lg bg-muted/30 overflow-hidden"
+              >
+                {/* Header: número + eliminar */}
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Artículo #{index + 1}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="h-7 w-7"
                     onClick={() => removeItem(index)}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Artículo</Label>
-                    <Select
-                      value={item.articleId}
-                      onValueChange={(val) => handleArticleSelect(index, val)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar artículo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {articles.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} - ${a.basePrice.toLocaleString("es-AR")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                <div className="p-3 space-y-3">
+                  {/* Selector de artículo - full width */}
+                  <Select
+                    value={item.articleId}
+                    onValueChange={(val) => handleArticleSelect(index, val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar artículo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articles.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} - ${a.basePrice.toLocaleString("es-AR")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Cantidad, Precio, Talle - 3 columnas en una fila */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Cant.</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 1)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Precio ($)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)
+                        }
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Talle</Label>
+                      <Input
+                        placeholder="M, L..."
+                        value={item.size}
+                        onChange={(e) => updateItem(index, "size", e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cantidad</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 1)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Precio unitario ($)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.unitPrice}
-                      onChange={(e) =>
-                        updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Talle</Label>
-                    <Input
-                      placeholder="Ej: M, L, XL"
-                      value={item.size}
-                      onChange={(e) => updateItem(index, "size", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Color</Label>
-                    <Input
-                      placeholder="Ej: Negro, Blanco"
-                      value={item.color}
-                      onChange={(e) => updateItem(index, "color", e.target.value)}
-                    />
-                  </div>
+
+                  {/* Subtotal */}
+                  <p className="text-sm text-right text-muted-foreground">
+                    Subtotal: <span className="font-semibold text-foreground">${(item.unitPrice * item.quantity).toLocaleString("es-AR")}</span>
+                  </p>
                 </div>
-                <p className="text-sm text-right text-muted-foreground">
-                  Subtotal: <span className="font-medium text-foreground">${(item.unitPrice * item.quantity).toLocaleString("es-AR")}</span>
-                </p>
               </div>
             ))}
 

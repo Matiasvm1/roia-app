@@ -1,23 +1,23 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
 
-  const pool = new pg.Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
+  // Supabase requiere SSL para conexiones externas (Vercel)
+  if (!connectionString.includes("sslmode=")) {
+    const sep = connectionString.includes("?") ? "&" : "?";
+    connectionString += `${sep}sslmode=require`;
+  }
 
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({ adapter });
 }
 

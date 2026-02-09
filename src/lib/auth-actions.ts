@@ -15,10 +15,16 @@ export async function login(formData: FormData) {
     return { error: "Usuario y contraseña son requeridos" };
   }
 
-  // Look up profile by username to get the email for Supabase Auth
-  const profile = await prisma.profile.findUnique({
-    where: { username },
-  });
+  let profile;
+  try {
+    // Look up profile by username to get the email for Supabase Auth
+    profile = await prisma.profile.findUnique({
+      where: { username },
+    });
+  } catch (err) {
+    console.error("[login] Database error:", err);
+    return { error: "Error de conexión con la base de datos. Intentá de nuevo." };
+  }
 
   if (!profile) {
     return { error: "Usuario o contraseña incorrectos" };
@@ -36,6 +42,7 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
+    console.error("[login] Supabase auth error:", error.message);
     if (error.message.includes("Invalid login credentials")) {
       return { error: "Usuario o contraseña incorrectos" };
     }

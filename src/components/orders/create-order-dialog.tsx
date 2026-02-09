@@ -92,7 +92,6 @@ export function CreateOrderDialog({ clients, statuses, articles }: CreateOrderDi
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           size: item.size || undefined,
-          color: undefined,
         }))
       )
     );

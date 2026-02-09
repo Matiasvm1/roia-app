@@ -14,21 +14,32 @@ export async function middleware(request: NextRequest) {
   // Skip public routes
   if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
     // If already logged in and trying to access login, redirect to dashboard
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    } catch {
+      // If auth check fails, allow access to public route
     }
     return response;
   }
 
   // Check auth for all other routes
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
+    if (!user) {
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  } catch {
+    // If auth check fails (e.g. invalid JWT), redirect to login
     const loginUrl = new URL("/auth/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);

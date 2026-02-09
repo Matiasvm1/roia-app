@@ -60,7 +60,6 @@ export default async function OrdersPage() {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       size: item.size,
-      color: item.color,
       notes: item.notes,
       article: { name: item.article.name, basePrice: item.article.basePrice },
     })),
@@ -135,11 +134,6 @@ export default async function OrdersPage() {
                             {item.size && (
                               <Badge variant="outline" className="text-xs py-0 px-1">
                                 {item.size}
-                              </Badge>
-                            )}
-                            {item.color && (
-                              <Badge variant="secondary" className="text-xs py-0 px-1">
-                                {item.color}
                               </Badge>
                             )}
                           </div>

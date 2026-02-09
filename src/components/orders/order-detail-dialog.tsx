@@ -39,7 +39,6 @@ export type SerializedOrderItem = {
   quantity: number;
   unitPrice: number;
   size: string | null;
-  color: string | null;
   notes: string | null;
   article: { name: string; basePrice: number };
 };
@@ -237,7 +236,6 @@ export function OrderDetailDialog({ order, statuses }: OrderDetailDialogProps) {
                     <TableHead className="text-center">Cant.</TableHead>
                     <TableHead className="text-right">P. Unit.</TableHead>
                     <TableHead className="hidden sm:table-cell">Talle</TableHead>
-                    <TableHead className="hidden sm:table-cell">Color</TableHead>
                     <TableHead className="text-right">Subtotal</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -268,13 +266,6 @@ export function OrderDetailDialog({ order, statuses }: OrderDetailDialogProps) {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {item.color ? (
-                            <Badge variant="secondary">{item.color}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
                         <TableCell className="text-right font-medium">
                           ${subtotal.toLocaleString("es-AR")}
                         </TableCell>
@@ -288,7 +279,7 @@ export function OrderDetailDialog({ order, statuses }: OrderDetailDialogProps) {
             {/* Mobile: mostrar talle y color debajo de cada item */}
             <div className="sm:hidden space-y-2">
               {order.items
-                .filter((item) => item.size || item.color)
+                .filter((item) => item.size)
                 .map((item) => (
                   <div
                     key={item.id}
@@ -296,7 +287,6 @@ export function OrderDetailDialog({ order, statuses }: OrderDetailDialogProps) {
                   >
                     <span className="font-medium">{item.article.name}:</span>
                     {item.size && <Badge variant="outline" className="text-xs">{item.size}</Badge>}
-                    {item.color && <Badge variant="secondary" className="text-xs">{item.color}</Badge>}
                   </div>
                 ))}
             </div>

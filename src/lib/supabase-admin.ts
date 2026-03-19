@@ -65,7 +65,7 @@ export async function storageCreateSignedUploadUrl(
   }
 
   const data = await res.json();
-  const signedUrl = data.url.startsWith("http") ? data.url : `${supabaseUrl}${data.url}`;
+  const signedUrl = data.url.startsWith("http") ? data.url : `${supabaseUrl}/storage/v1${data.url}`;
   return { signedUrl, token: data.token, path: data.path };
 }
 

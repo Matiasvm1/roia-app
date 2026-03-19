@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { uploadOrderImage, deleteOrderImage } from "@/lib/actions";
+import { createOrderImageUploadUrl, confirmOrderImageUpload, deleteOrderImage } from "@/lib/actions";
 
 export type ImageData = {
   id: string;
@@ -37,19 +37,37 @@ export function OrderImageGallery({ orderId, images: initialImages, editable = f
     setError(null);
     setUploading(true);
 
-    // Subir cada archivo
+    // Subir cada archivo via presigned URL
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const formData = new FormData();
-      formData.set("orderId", orderId);
-      formData.set("file", file);
 
-      const result = await uploadOrderImage(formData);
+      // Step 1: Get signed upload URL from server
+      const urlResult = await createOrderImageUploadUrl(orderId, file.name, file.type);
 
-      if (result.error) {
-        setError(typeof result.error === "string" ? result.error : "Error al subir imagen");
-      } else if (result.image) {
-        setImages((prev) => [...prev, result.image!]);
+      if ("error" in urlResult) {
+        setError(urlResult.error);
+        continue;
+      }
+
+      // Step 2: Upload directly to Supabase Storage
+      const uploadRes = await fetch(urlResult.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        setError("Error al subir la imagen al storage.");
+        continue;
+      }
+
+      // Step 3: Confirm upload and persist in DB
+      const confirmResult = await confirmOrderImageUpload(orderId, urlResult.storagePath, file.name);
+
+      if ("error" in confirmResult) {
+        setError(confirmResult.error);
+      } else {
+        setImages((prev) => [...prev, confirmResult.image]);
       }
     }
 

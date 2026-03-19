@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getSupabaseAdmin, DESIGNS_BUCKET, storageDelete, storagePublicUrl } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, DESIGNS_BUCKET, storageCreateSignedUploadUrl, storageDelete, storagePublicUrl } from "@/lib/supabase-admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -422,63 +422,60 @@ export async function deleteOrder(id: string) {
 // IMÁGENES DE DISEÑO
 // ═══════════════════════════════════════════════════════════════
 
-export async function uploadOrderImage(formData: FormData) {
-  const orderId = formData.get("orderId") as string;
-  const file = formData.get("file") as File;
-
+export async function createOrderImageUploadUrl(
+  orderId: string,
+  fileName: string,
+  contentType: string
+): Promise<{ signedUrl: string; storagePath: string } | { error: string }> {
   if (!orderId) return { error: "ID de orden requerido" };
-  if (!file || file.size === 0) return { error: "Seleccioná una imagen" };
+  if (!fileName) return { error: "Nombre de archivo requerido" };
 
-  // Validar tipo
   const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!validTypes.includes(file.type)) {
+  if (!validTypes.includes(contentType)) {
     return { error: "Formato no soportado. Usá JPG, PNG, WebP o GIF." };
   }
 
-  // Validar tamaño (10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    return { error: "La imagen no puede superar los 10MB." };
+  const safeName = fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .substring(0, 50);
+  const storagePath = `orders/${orderId}/${Date.now()}-${safeName}`;
+
+  const result = await storageCreateSignedUploadUrl(DESIGNS_BUCKET, storagePath);
+
+  if ("error" in result) {
+    return { error: `Error al generar URL de subida: ${result.error}` };
   }
 
+  return { signedUrl: result.signedUrl, storagePath };
+}
+
+export async function confirmOrderImageUpload(
+  orderId: string,
+  storagePath: string,
+  fileName: string
+): Promise<
+  | { success: true; image: { id: string; url: string; fileName: string } }
+  | { error: string }
+> {
+  if (!orderId) return { error: "ID de orden requerido" };
+  if (!storagePath) return { error: "Storage path requerido" };
+  if (!fileName) return { error: "Nombre de archivo requerido" };
+
   try {
-    // Generar path único: orders/{orderId}/{timestamp}-{filename}
-    const safeName = file.name
-      .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .substring(0, 50);
-    const storagePath = `orders/${orderId}/${Date.now()}-${safeName}`;
-
-    // TODO(Phase 2): replaced by presigned URL flow — storageUpload removed
-    const uploadError = "Direct upload not implemented yet — use presigned URL flow";
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      return { error: `Error al subir: ${uploadError}` };
-    }
-
-    // Obtener URL pública
     const publicUrl = storagePublicUrl(DESIGNS_BUCKET, storagePath);
 
-    // Guardar en DB
     const image = await prisma.orderImage.create({
-      data: {
-        orderId,
-        url: publicUrl,
-        fileName: file.name,
-        storagePath,
-      },
+      data: { orderId, url: publicUrl, fileName, storagePath },
     });
 
     revalidatePath("/orders");
     return {
       success: true,
-      image: {
-        id: image.id,
-        url: image.url,
-        fileName: image.fileName,
-      },
+      image: { id: image.id, url: image.url, fileName: image.fileName },
     };
   } catch (err) {
-    console.error("Upload error:", err);
-    return { error: "Error inesperado al subir la imagen." };
+    console.error("confirmOrderImageUpload error:", err);
+    return { error: "Error inesperado al confirmar la subida." };
   }
 }
 

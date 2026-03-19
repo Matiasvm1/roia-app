@@ -17,6 +17,37 @@ export type ImageData = {
   fileName: string;
 };
 
+function xhrUpload(
+  signedUrl: string,
+  file: File,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Error al subir archivo: HTTP ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Error de red al subir archivo"));
+    xhr.ontimeout = () => reject(new Error("Timeout al subir archivo"));
+
+    xhr.open("PUT", signedUrl);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.send(file);
+  });
+}
+
 interface OrderImageGalleryProps {
   orderId: string;
   images: ImageData[];
@@ -26,6 +57,8 @@ interface OrderImageGalleryProps {
 export function OrderImageGallery({ orderId, images: initialImages, editable = false }: OrderImageGalleryProps) {
   const [images, setImages] = useState<ImageData[]>(initialImages);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLabel, setUploadLabel] = useState("Subiendo...");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,45 +67,59 @@ export function OrderImageGallery({ orderId, images: initialImages, editable = f
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const MAX_SIZE = 52_428_800; // 50MB
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
     setError(null);
     setUploading(true);
+    setUploadProgress(0);
 
-    // Subir cada archivo via presigned URL
-    for (let i = 0; i < files.length; i++) {
+    const total = files.length;
+
+    for (let i = 0; i < total; i++) {
       const file = files[i];
 
-      // Step 1: Get signed upload URL from server
-      const urlResult = await createOrderImageUploadUrl(orderId, file.name, file.type);
+      setUploadLabel(total > 1 ? `Subiendo ${i + 1} de ${total}...` : "Subiendo...");
 
+      // Client-side validation BEFORE hitting server
+      if (!validTypes.includes(file.type)) {
+        setError(`"${file.name}": Formato no soportado. Usá JPG, PNG, WebP o GIF.`);
+        continue;
+      }
+
+      if (file.size > MAX_SIZE) {
+        setError(`"${file.name}": La imagen no puede superar los 50MB.`);
+        continue;
+      }
+
+      const urlResult = await createOrderImageUploadUrl(orderId, file.name, file.type);
       if ("error" in urlResult) {
         setError(urlResult.error);
         continue;
       }
 
-      // Step 2: Upload directly to Supabase Storage
-      const uploadRes = await fetch(urlResult.signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
+      const { signedUrl, storagePath } = urlResult;
 
-      if (!uploadRes.ok) {
-        setError("Error al subir la imagen al storage.");
+      try {
+        await xhrUpload(signedUrl, file, (pct) => setUploadProgress(pct));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al subir archivo");
         continue;
       }
 
-      // Step 3: Confirm upload and persist in DB
-      const confirmResult = await confirmOrderImageUpload(orderId, urlResult.storagePath, file.name);
-
+      const confirmResult = await confirmOrderImageUpload(orderId, storagePath, file.name);
       if ("error" in confirmResult) {
         setError(confirmResult.error);
-      } else {
-        setImages((prev) => [...prev, confirmResult.image]);
+        continue;
       }
+
+      setImages((prev) => [...prev, confirmResult.image]);
+      setUploadProgress(0);
     }
 
     setUploading(false);
-    // Limpiar el input para permitir subir el mismo archivo
+    setUploadProgress(0);
+
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -116,7 +163,7 @@ export function OrderImageGallery({ orderId, images: initialImages, editable = f
               {uploading ? (
                 <>
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  Subiendo...
+                  {uploadLabel}
                 </>
               ) : (
                 <>
@@ -131,6 +178,15 @@ export function OrderImageGallery({ orderId, images: initialImages, editable = f
 
       {error && (
         <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
+      )}
+
+      {uploading && (
+        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-primary h-1.5 transition-all duration-150"
+            style={{ width: `${uploadProgress}%` }}
+          />
+        </div>
       )}
 
       {images.length === 0 ? (

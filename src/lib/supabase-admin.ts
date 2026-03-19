@@ -34,14 +34,13 @@ export function getSupabaseAdmin() {
 export const DESIGNS_BUCKET = "designs";
 
 /**
- * Upload a file to Supabase Storage using the REST API directly.
+ * Create a signed upload URL for direct client-side upload to Supabase Storage.
+ * Returns a URL the browser can PUT to directly — no service role key in client.
  */
-export async function storageUpload(
+export async function storageCreateSignedUploadUrl(
   bucket: string,
-  path: string,
-  body: Uint8Array,
-  contentType: string
-): Promise<{ error: string | null }> {
+  path: string
+): Promise<{ signedUrl: string; token: string; path: string } | { error: string }> {
   const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const serviceRoleKey = cleanKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -49,26 +48,25 @@ export async function storageUpload(
     return { error: "Supabase env vars not set" };
   }
 
-  const url = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`;
+  const url = `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${path}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
       apikey: serviceRoleKey,
-      "Content-Type": contentType,
-      "x-upsert": "false",
+      "Content-Type": "application/json",
     },
-    body: body as unknown as BodyInit,
   });
 
   if (!res.ok) {
     const errBody = await res.text();
-    console.error("[storageUpload] error:", res.status, errBody);
-    return { error: `Storage error ${res.status}: ${errBody}` };
+    console.error("[storageCreateSignedUploadUrl] error:", res.status, errBody);
+    return { error: `Storage sign error ${res.status}: ${errBody}` };
   }
 
-  return { error: null };
+  const data = await res.json();
+  return { signedUrl: data.url, token: data.token, path: data.path };
 }
 
 /**

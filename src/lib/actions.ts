@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getSupabaseAdmin, DESIGNS_BUCKET, storageUpload, storageDelete, storagePublicUrl } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, DESIGNS_BUCKET, storageDelete, storagePublicUrl } from "@/lib/supabase-admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -447,17 +447,8 @@ export async function uploadOrderImage(formData: FormData) {
       .substring(0, 50);
     const storagePath = `orders/${orderId}/${Date.now()}-${safeName}`;
 
-    // Convertir File a Uint8Array para el upload server-side
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-
-    const { error: uploadError } = await storageUpload(
-      DESIGNS_BUCKET,
-      storagePath,
-      bytes,
-      file.type
-    );
-
+    // TODO(Phase 2): replaced by presigned URL flow — storageUpload removed
+    const uploadError = "Direct upload not implemented yet — use presigned URL flow";
     if (uploadError) {
       console.error("Upload error:", uploadError);
       return { error: `Error al subir: ${uploadError}` };

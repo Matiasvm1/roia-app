@@ -55,7 +55,6 @@ export async function storageCreateSignedUploadUrl(
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
       apikey: serviceRoleKey,
-      "Content-Type": "application/json",
     },
   });
 
